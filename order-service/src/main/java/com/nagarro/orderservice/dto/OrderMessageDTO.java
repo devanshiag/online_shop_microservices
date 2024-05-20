@@ -2,8 +2,7 @@ package com.nagarro.orderservice.dto;
 
 import java.time.LocalDate;
 
-import com.nagarro.orderservice.model.OrderStatus;
-
+import jakarta.persistence.Id;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,12 +12,15 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OrderResponse {
+public class OrderMessageDTO {
 
+	
 	private Long id;
     private Long customerId;
     private LocalDate orderDate;
     private Long productId;
     private Integer quantity;
-    private OrderStatus status;
+    private Double totalCost;
+
+    
 }

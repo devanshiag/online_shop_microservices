@@ -20,9 +20,9 @@ public class Customer {
 	
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private long id;
+	private Long id;
 	private String name;
-	private int age;
-	private double wallet_balance;
-	private boolean active;
+	private Integer age;
+	private Double wallet_balance;
+	private Boolean active;
 }

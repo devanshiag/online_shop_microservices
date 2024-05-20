@@ -9,11 +9,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CustomerResponse {
+public class ConfirmationDTO {
 
-	private Long id;
-	private String name;
-	private Integer age;
-	private Double wallet_balance;
-	private Boolean active;
+	private Long orderId;
+	private Boolean status;
 }

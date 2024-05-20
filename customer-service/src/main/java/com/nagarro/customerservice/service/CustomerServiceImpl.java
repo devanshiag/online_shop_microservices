@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import com.nagarro.customerservice.dto.CustomerRequest;
 import com.nagarro.customerservice.dto.CustomerResponse;
+import com.nagarro.customerservice.exception.CustomerNotFoundException;
 import com.nagarro.customerservice.model.Customer;
 import com.nagarro.customerservice.repository.CustomerRepository;
 
@@ -21,9 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Slf4j
 public class CustomerServiceImpl implements CustomerService{
-	
-//	private static final Logger log = LoggerFactory.getLogger(CustomerServiceImpl.class);
-	
+		
 	@Autowired
     private CustomerRepository customerRepository;
 
@@ -57,7 +56,7 @@ public class CustomerServiceImpl implements CustomerService{
 				.name(customer.getName())
 				.age(customer.getAge())
 				.wallet_balance(customer.getWallet_balance())
-				.active(customer.isActive())
+				.active(customer.getActive())
 				.build();
 		
 	}
@@ -76,19 +75,23 @@ public class CustomerServiceImpl implements CustomerService{
 
 	@Override
     public CustomerResponse updateCustomer(Long id, CustomerRequest updatedCustomer) {
-        Optional<Customer> existingCustomerOptional = customerRepository.findById(id);
+		Optional<Customer> existingCustomerOptional = customerRepository.findById(id);
 
-        Customer existingCustomer = existingCustomerOptional.get();
-
-        existingCustomer.setName(updatedCustomer.getName());
-        existingCustomer.setAge(updatedCustomer.getAge());
-        existingCustomer.setWallet_balance(updatedCustomer.getWallet_balance());
-        existingCustomer.setActive(true);
-       
-        customerRepository.save(existingCustomer);
-        log.info("Updated customer with id {}", existingCustomer.getId());
-        
-        return mapToCustomerResponse(existingCustomer);
+	    if (existingCustomerOptional.isPresent()) {
+	        Customer existingCustomer = existingCustomerOptional.get();
+	        
+	        existingCustomer.setName(updatedCustomer.getName());
+	        existingCustomer.setAge(updatedCustomer.getAge());
+	        existingCustomer.setWallet_balance(updatedCustomer.getWallet_balance());
+	        existingCustomer.setActive(true);
+	       
+	        customerRepository.save(existingCustomer);
+	        log.info("Updated customer with id {}", existingCustomer.getId());
+	        
+	        return mapToCustomerResponse(existingCustomer);
+	    } else {
+	        throw new CustomerNotFoundException("Customer not found with ID: " + id);
+	    }
         
     }
 
@@ -105,10 +108,5 @@ public class CustomerServiceImpl implements CustomerService{
         }
         return false;
     }
-
-	
-
-
-
 	
 }

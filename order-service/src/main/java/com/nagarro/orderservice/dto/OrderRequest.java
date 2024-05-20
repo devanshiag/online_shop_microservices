@@ -26,7 +26,7 @@ public class OrderRequest{
 	@NotNull(message = "Product quantity is required")
     @Column(name = "product_quantity")
 	@Min(value = 1, message = "At least 1 quantity is required")
-    private int quantity;
+    private Integer quantity;
 
 }
 

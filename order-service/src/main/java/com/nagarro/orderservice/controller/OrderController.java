@@ -3,12 +3,14 @@ package com.nagarro.orderservice.controller;
 import java.util.List;
 import java.util.Optional;
 
+import org.hibernate.sql.results.graph.entity.internal.BatchEntityInsideEmbeddableSelectFetchInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -41,15 +43,20 @@ public class OrderController {
 	
 	@Autowired
 	private RestTemplate restTemplate;
+	
 
+	@PreAuthorize("hasRole('client_user')")
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody OrderRequest orderRequest) {
+    	
+    	logger.info("controller: inside create");
   	
         OrderResponse createdOrder = orderService.createOrder(orderRequest);
         
         return ResponseEntity.status(HttpStatus.CREATED).body(createdOrder);
     }
     
+    @PreAuthorize("hasRole('client_admin')")
     @GetMapping
     public ResponseEntity<Object> getAllOrders() {
             List<OrderResponse> orders = orderService.getAllOrders();
@@ -72,11 +79,6 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.OK).body(searchedOrder.get());
     }
     
-//    @PatchMapping("/{id}")
-//    public ResponseEntity<Object> placeOrder(@PathVariable Long id){
-//    	OrderResponse placedOrder = orderService.placeOrder(id);
-//		return ResponseEntity.status(HttpStatus.OK).body(placedOrder);
-//    }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Object> cancelOrder(@PathVariable Long id) {

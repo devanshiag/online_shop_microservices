@@ -39,6 +39,9 @@ public class Order {
     
     @Column(name = "product_quantity")
     private int quantity;
+    
+    @Column(name = "total_order_cost")
+    private Double totalCost;
 
     @Enumerated(EnumType.STRING)
     private OrderStatus status;

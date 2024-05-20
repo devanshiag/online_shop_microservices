@@ -11,6 +11,8 @@ import org.hibernate.internal.build.AllowSysOut;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -28,18 +30,19 @@ public class GlobalExceptionHandler {
                 .stream().map(FieldError::getDefaultMessage).collect(Collectors.toList());
         return new ResponseEntity<>(getErrorsMap(errors, HttpStatus.BAD_REQUEST), new HttpHeaders(), HttpStatus.BAD_REQUEST);
     }
+    
+    @ExceptionHandler(AuthenticationException.class)
+    public final ResponseEntity<Map<String, Object>> handleAuthenticationException(AuthenticationException ex) {
+        List<String> errors = Collections.singletonList("Unauthorized: " + ex.getMessage());
+        return new ResponseEntity<>(getErrorsMap(errors, HttpStatus.UNAUTHORIZED), new HttpHeaders(), HttpStatus.UNAUTHORIZED);
+    }
 
-//    @ExceptionHandler(CustomerNotFoundException.class)
-//    public ResponseEntity<Map<String, Object>> handleCustomerNotFoundException(CustomerNotFoundException ex) {
-//        List<String> errors = Collections.singletonList(ex.getMessage());
-//        return new ResponseEntity<>(getErrorsMap(errors, HttpStatus.NOT_FOUND), new HttpHeaders(), HttpStatus.NOT_FOUND);
-//    }
-//    
-//    @ExceptionHandler(OrderNotFoundException.class)
-//    public ResponseEntity<Map<String, Object>> handleOrderNotFoundException(OrderNotFoundException ex) {
-//        List<String> errors = Collections.singletonList(ex.getMessage());
-//        return new ResponseEntity<>(getErrorsMap(errors, HttpStatus.NOT_FOUND), new HttpHeaders(), HttpStatus.NOT_FOUND);
-//    }
+    @ExceptionHandler(AccessDeniedException.class)
+    public final ResponseEntity<Map<String, Object>> handleAccessDeniedException(AccessDeniedException ex) {
+        List<String> errors = Collections.singletonList("Forbidden: " + ex.getMessage());
+        return new ResponseEntity<>(getErrorsMap(errors, HttpStatus.FORBIDDEN), new HttpHeaders(), HttpStatus.FORBIDDEN);
+    }
+    
     
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFoundException(NotFoundException ex) {
@@ -60,6 +63,11 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(getErrorsMap(errors, HttpStatus.NOT_ACCEPTABLE), new HttpHeaders(), HttpStatus.NOT_ACCEPTABLE);
     }
     
+    @ExceptionHandler(CustomerServiceUnauthorizedException.class)
+    public final ResponseEntity<Map<String, Object>> handleCustomerServiceUnauthorizedException(CustomerServiceUnauthorizedException ex) {
+        List<String> errors = Collections.singletonList(ex.getMessage());
+        return new ResponseEntity<>(getErrorsMap(errors, HttpStatus.UNAUTHORIZED), new HttpHeaders(), HttpStatus.UNAUTHORIZED);
+    }
     
     @ExceptionHandler(IllegalArgumentException.class)
     public final ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException ex) {

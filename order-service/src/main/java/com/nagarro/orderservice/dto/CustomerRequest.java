@@ -1,7 +1,4 @@
-package com.nagarro.customerservice.dto;
-
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.nagarro.customerservice.util.CustomIntegerSerializer;
+package com.nagarro.orderservice.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -29,7 +26,6 @@ public class CustomerRequest {
     @Positive(message = "Age should be a positive number")
 	@Min(value=13, message = "Minimum age should be at least 13")
 	@Max(value = 110, message = "Maximum age can be 110")
-	@JsonDeserialize(using = CustomIntegerSerializer.class)
 	private Integer age;
 	
 	@Min(value = 0, message = "Balance cannot be negative")

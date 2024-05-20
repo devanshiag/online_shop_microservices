@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -33,11 +34,10 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/v1/customers")
 public class CustomerController {
 	
-//    private static final Logger logger = LoggerFactory.getLogger(CustomerController.class);
-
     @Autowired
     private CustomerService customerService;
 
+    
     @PostMapping("/")
     public ResponseEntity<Object> addCustomer(@Valid @RequestBody CustomerRequest customerRequest) {
 
@@ -54,6 +54,7 @@ public class CustomerController {
     }
 
 
+    @PreAuthorize("hasRole('client_admin')")
     @GetMapping("/all")
     public ResponseEntity<Object> getAllCustomers() {
             List<CustomerResponse> customers = customerService.getAllCustomers();
@@ -69,7 +70,7 @@ public class CustomerController {
         
     }
 
-
+    
     @GetMapping("/{id}")
     public ResponseEntity<Object> getCustomerById(@PathVariable Long id) {
         Optional<CustomerResponse> searchedCustomer = customerService.getCustomerById(id);
@@ -80,7 +81,7 @@ public class CustomerController {
         return ResponseEntity.status(HttpStatus.OK).body(searchedCustomer.get());
     }
 
-
+    @PreAuthorize("hasRole('client_user')")
     @PutMapping("/{id}")
     public ResponseEntity<Object> updateCustomer(@PathVariable Long id, @Valid @RequestBody CustomerRequest customerRequest) {
         log.info("Updating customer with ID: {}", id);

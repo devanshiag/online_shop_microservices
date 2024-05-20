@@ -1,5 +1,8 @@
 package com.nagarro.customerservice.dto;
 
+import java.time.LocalDate;
+
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,11 +12,11 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CustomerResponse {
+public class OrderResponse {
 
 	private Long id;
-	private String name;
-	private Integer age;
-	private Double wallet_balance;
-	private Boolean active;
+    private Long customerId;
+    private LocalDate orderDate;
+    private Long productId;
+    private Integer quantity;
 }

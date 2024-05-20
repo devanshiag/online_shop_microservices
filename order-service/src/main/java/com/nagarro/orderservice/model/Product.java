@@ -17,7 +17,6 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "d_products")
 public class Product {
 
     @Id
@@ -26,9 +25,9 @@ public class Product {
 
     private String name;
 
-    private int count;
+    private Integer count;
 
-    private double cost;
+    private Double cost;
 
 	@Override
 	public String toString() {

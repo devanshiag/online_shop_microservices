@@ -1,20 +1,32 @@
 package com.nagarro.orderservice.service;
 
 import java.time.LocalDate;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 
+import org.hibernate.cache.spi.support.NaturalIdNonStrictReadWriteAccess;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import com.nagarro.orderservice.dto.CustomerRequest;
 import com.nagarro.orderservice.dto.CustomerResponse;
 import com.nagarro.orderservice.dto.OrderRequest;
 import com.nagarro.orderservice.dto.OrderResponse;
 import com.nagarro.orderservice.exception.CustomerNotFoundException;
+import com.nagarro.orderservice.exception.CustomerServiceUnauthorizedException;
 import com.nagarro.orderservice.exception.InsufficientWalletBalance;
 import com.nagarro.orderservice.exception.OrderNotFoundException;
 import com.nagarro.orderservice.exception.ProductNotFoundException;
@@ -31,8 +43,6 @@ import lombok.extern.slf4j.Slf4j;
 public class OrderServiceImpl implements OrderService{
 	
     private final String CUSTOMER_SERVICE_URL = "http://localhost:8585/api/v1/customers";
-
-//	private static final Logger logger = LoggerFactory.getLogger(OrderServiceImpl.class);
 	
 	@Autowired
 	private OrderRepository orderRepository;
@@ -42,62 +52,96 @@ public class OrderServiceImpl implements OrderService{
 	
 	@Autowired
 	private RestTemplate restTemplate;
+	
+	@Autowired
+    private OrderMessageProducer orderMessageProducer;
 
 	@Override
 	public OrderResponse createOrder(OrderRequest orderRequest) {
-		CustomerResponse customer = null;;
+		CustomerResponse customer = null;
 		
 	    try {
-	        customer = restTemplate.getForObject(CUSTOMER_SERVICE_URL + "/" + orderRequest.getCustomerId(), CustomerResponse.class);
+	    	ResponseEntity<CustomerResponse> responseEntity = restTemplate.exchange(
+		            CUSTOMER_SERVICE_URL + "/" + orderRequest.getCustomerId(),
+		            HttpMethod.GET,
+		            null,
+		            CustomerResponse.class
+		        );
+	    	customer = responseEntity.getBody();
 	        log.info("customer found with id {}", orderRequest.getCustomerId());
+
 	    } catch (HttpClientErrorException.NotFound e) {
-	        // Customer not found, create a new customer
+	    	
 	    	throw new CustomerNotFoundException("No customer found with id " + orderRequest.getCustomerId());
-	    }catch (Exception e) {
-			e.printStackTrace();
-		}
+	    }catch (HttpClientErrorException.Unauthorized e) {
+	       
+	    	throw new CustomerServiceUnauthorizedException("Unauthorized access to the Customer service");
+	    }
 	    
     	log.info(orderRequest.toString());
 
-    	Optional<Product> product = productRepository.findById(orderRequest.getProductId());
+    	Optional<Product> optionalProduct = productRepository.findById(orderRequest.getProductId());
     	
     	//check if product exists
-    	if(!product.isPresent()) 
+    	if(!optionalProduct.isPresent()) 
             throw new ProductNotFoundException("Product not found with ID: " + orderRequest.getProductId());
     	
     	Order order = new Order();
-
-    	order.setProductId(orderRequest.getProductId());
-    	order.setQuantity(orderRequest.getQuantity());
-    	order.setCustomerId(orderRequest.getCustomerId());
-    	order.setOrderDate(LocalDate.now());
-    	order.setStatus(OrderStatus.PENDING);    	
+    	Product product = optionalProduct.get();
+    	
+    	double orderTotal = product.getCost() * orderRequest.getQuantity();
+    	
+    	//checking the balance to start creating 
+    	log.info("order total: " + orderTotal + "customer balance: "+customer.getWallet_balance());
+    	
+    	if(orderTotal<=customer.getWallet_balance()) {
+    		order.setProductId(orderRequest.getProductId());
+        	order.setQuantity(orderRequest.getQuantity());
+        	order.setCustomerId(orderRequest.getCustomerId());
+        	order.setOrderDate(LocalDate.now());
+        	order.setTotalCost(orderTotal);
+        	order.setStatus(OrderStatus.PENDING); 
+    		
+    	}
+    	else {
+			throw new InsufficientWalletBalance("Sorry, your order can't be created due to insufficient wallet balance");
+		}
 
     	log.info("the order received in request is {}", order.toString());
     	
     	
-	    if(product.get().getCost() * order.getQuantity() <= customer.getWallet_balance()) {
-         	  order.setStatus(OrderStatus.CONFIRMED);
-         	  
-         	  //deduct customer's balance
-         	  /*
-         	   * 
-         	   * 
-         	   * 
-         	   * 
-         	   * 
-         	   * 
-         	   */
+
+    	if(order.getQuantity()<= product.getCount()) {
+	        
+    		orderRepository.save(order);
+    		
+    		orderMessageProducer.sendMessage(order);
+    		log.info("Order message sent from order service to order queue!!");
+    		
+	        product.setCount(product.getCount()-order.getQuantity());
+	        productRepository.save(product);
           }
         else {
-        	  throw new InsufficientWalletBalance("Insufficient balance in wallet to purchase product with id "+order.getProductId());
-        }
-		
-	    
-	    orderRepository.save(order);
+        	  throw new ProductNotFoundException("Out of stock! product with id "+order.getProductId());
+        }	
+
+
 	    log.info("Order saved "+ order.toString());
+	   
+	    
 		return mapToOrderResponse(order);
 	}
+	
+	@Override
+	public void confirmOrder(Long orderId) {
+	    Optional<Order> optionalOrder = orderRepository.findById(orderId);
+	    optionalOrder.ifPresent(order -> {
+	        order.setStatus(OrderStatus.CONFIRMED);
+	        log.info("Order confirmed!!!!");
+	        orderRepository.save(order);
+	    });
+	}
+
 	
 	private OrderResponse mapToOrderResponse(Order order) {
 		return OrderResponse.builder()
@@ -117,6 +161,14 @@ public class OrderServiceImpl implements OrderService{
         if (optionalOrder.isPresent()) {
             Order order = optionalOrder.get();
             order.setStatus(OrderStatus.CANCELLED);
+            
+            Optional<Product> optionalProduct =  productRepository.findById(order.getProductId());
+            if(optionalProduct.isPresent()) {
+            	Product product = optionalProduct.get();
+            	product.setCount(product.getCount() + order.getQuantity());
+            	productRepository.save(product);
+            }
+            
             orderRepository.save(order);
         }
         else {
@@ -139,38 +191,5 @@ public class OrderServiceImpl implements OrderService{
 		return order.map(o->mapToOrderResponse(o));
 		
 	}
-
-	/*
-	 * checks if the customer has enough wallet balance to buy product in their order and then confirms order
-	 */
-//	@Override
-//	public OrderResponse placeOrder(Long id) throws ProductNotFoundException{
-//		Optional<Order> optionalorder =  orderRepository.findById(id);
-//		if(optionalorder.isPresent()) {
-//			Order order = optionalorder.get();
-//			
-//		
-//			Optional<Product> optionalProduct = productRepository.findById(order.getProductId());
-//			int quantity = order.getQuantity();
-//			
-//	        if (!optionalProduct.isPresent()) {
-//	            throw new ProductNotFoundException("Product not found with ID: " + order.getProductId());
-//	        }	        
-//	        
-//	    	Customer customer =  restTemplate.getForObject(CUSTOMER_SERVICE_URL + "/" + order.getCustomerId(), Customer.class);
-//
-//	        
-//	        if(optionalProduct.get().getCost() * quantity <= customer.getWallet_balance()) {
-//	        	order.setStatus(OrderStatus.CONFIRMED);
-//				return orderRepository.save(order);
-//	        }
-//	        else {
-//	        	throw new InsufficientWalletBalance("Insufficient balance in wallet to purchase product with id "+order.getProductId());
-//	        }
-//		}
-//		return null;
-//		
-//	}
-
 
 }
